@@ -13,8 +13,8 @@ Your processor only needs to support the AVX512 Fundamental instruction set (`/p
 Running my `benchmark` tool on a single core Skylake Server processor (`Intel(R) Xeon(R) CPU @ 2.00GHz`) running Ubuntu Server 22.04 I get the following results rather consistently (within a margin of error):
 
 ```
-Encoded 4000000 random points 20 times in 4.115627 seconds
-Effective rate: 19438107.49 points per second
+Encoded 4000000 random points 20 times in 2.660274 seconds
+Effective rate: 30072090.32 points per second
 ```
 
 ## To Do

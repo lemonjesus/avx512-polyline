@@ -7,10 +7,12 @@
 
 #ifdef POLYLINE_DEBUG
 #define debug(...) printf(__VA_ARGS__)
+#define debug_m128i(x) print_m128i(x)
 #define debug_m512(x) print_m512(x)
 #define debug_m512i(x) print_m512i(x)
 #else
 #define debug(...)
+#define debug_m128i(x)
 #define debug_m512(x)
 #define debug_m512i(x)
 #endif
@@ -18,6 +20,11 @@
 #define FIVE(x, i) (x >> (i*5)) & 0b00011111
 #define FIVE_BIT_CHUNKS(x) FIVE(x, 0), FIVE(x, 1), FIVE(x, 2), FIVE(x, 3), FIVE(x, 4), FIVE(x, 5)
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
+
+void print_m128i(__m128i v) {
+    char *p = (char *)&v;
+    printf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+}
 
 void print_m512(__m512d v) {
     double *p = (double *)&v;
@@ -87,7 +94,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("mask1:\t %X\n", mask1);
 
         // or with 0x20 according to mask2
-        x = _mm512_mask_or_epi8(x, mask1 << 1, x, _mm512_set1_epi32(0x20));
+        x = _mm512_mask_or_epi32(x, mask1 << 1, x, _mm512_set1_epi32(0x20));
         debug("or\t"); debug_m512i(x);
 
         // add 63 according to mask1 
@@ -102,19 +109,19 @@ void encode_polyline(double* a, int points, char* outbuf) {
         x = _mm512_permutexvar_epi32(_mm512_set_epi32(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15), x);
         debug("perm\t"); debug_m512i(x);
 
-        int *p = (int *)&x;
-
         // compress the array to one end
         __mmask16 mask2 = _mm512_cmpgt_epi32_mask(x, _mm512_setzero_epi32());
         x = _mm512_maskz_compress_epi32(mask2, x);
         debug("comp\t"); debug_m512i(x);
         debug("to write: %d\n", __builtin_popcount(mask2));
 
-        // write the output (can this be optimized further?)
-        for(int i = 0; i < __builtin_popcount(mask2); i++) {
-            debug("%c", p[i]);
-            outbuf[out_idx++] = (uint8_t)p[i];
-        }
+        // convert everything into 8-bit numbers
+        __m128i y = _mm512_maskz_cvtepi32_epi8(0xFFFF, x);
+        debug_m128i(y);
+
+        _mm_mask_storeu_epi8(outbuf+out_idx, mask2, y);
+        out_idx += __builtin_popcount(mask2);
+
         debug("\n\n");
     }
 
