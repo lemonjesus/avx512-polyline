@@ -3,6 +3,10 @@
 #include <string.h>
 #include <stdint.h>
 
+#define FIVE(x, i) (x >> (i*5)) & 0b00011111
+#define FIVE_BIT_CHUNKS(x) FIVE(x, 0), FIVE(x, 1), FIVE(x, 2), FIVE(x, 3), FIVE(x, 4), FIVE(x, 5)
+#define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
+
 // #define POLYLINE_DEBUG
 
 #ifdef POLYLINE_DEBUG
@@ -10,16 +14,6 @@
 #define debug_m128i(x) print_m128i(x)
 #define debug_m512(x) print_m512(x)
 #define debug_m512i(x) print_m512i(x)
-#else
-#define debug(...)
-#define debug_m128i(x)
-#define debug_m512(x)
-#define debug_m512i(x)
-#endif
-
-#define FIVE(x, i) (x >> (i*5)) & 0b00011111
-#define FIVE_BIT_CHUNKS(x) FIVE(x, 0), FIVE(x, 1), FIVE(x, 2), FIVE(x, 3), FIVE(x, 4), FIVE(x, 5)
-#define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
 void print_m128i(__m128i v) {
     char *p = (char *)&v;
@@ -36,19 +30,27 @@ void print_m512i(__m512i v) {
     printf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
 }
 
+#else
+#define debug(...)
+#define debug_m128i(x)
+#define debug_m512(x)
+#define debug_m512i(x)
+#endif
+
 void encode_polyline(double* a, int points, char* outbuf) {
-    uint32_t* ibuf = (uint32_t*)malloc(sizeof(uint32_t)*ROUND_UP(points*2, 32));
+    uint32_t *ibuf = (uint32_t*)malloc(sizeof(uint32_t)*ROUND_UP(points*2, 32));
     
     for(int i = 0; i < points*2; i+=16) {
-        __mmask8 loadm1 = ((i+8-points*2) < 0) ? 0xFF : (0xFF >> (i+8-points*2))&0xFF;
-        __mmask8 loadm2 = ((i+16-points*2) < 0) ? 0xFF : (0xFF >> (i+16-points*2))&0xFF;
+        __mmask8 loadm1 = ((i+8-points*2) < 0) ? 0xFF : (0xFF >> (i+8-points*2)) & 0xFF;
+        __mmask8 loadm2 = ((i+16-points*2) < 0) ? 0xFF : (0xFF >> (i+16-points*2)) & 0xFF;
         __m512d in1 = _mm512_maskz_loadu_pd(loadm1, a+i);
         __m512d in2 = _mm512_maskz_loadu_pd(loadm2, a+i+8);
 
         // calculate deltas
         __m512d sub1 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in1);
         __m512d sub2 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in2);
-        if(i != 0) sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
+        if(i != 0) 
+            sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
         sub2 = _mm512_maskz_add_pd(loadm2, sub2, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i+7], a[i+6]));
         debug("sub1:\t"); debug_m512(sub1);
         debug("sub2:\t"); debug_m512(sub2);
@@ -63,7 +65,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         __m256i mul1 = _mm512_cvtpd_epi32(_mm512_mul_pd(in1, _mm512_set1_pd(1e5)));
         __m256i mul2 = _mm512_cvtpd_epi32(_mm512_mul_pd(in2, _mm512_set1_pd(1e5)));
 
-        __m512i mul = _mm512_maskz_broadcast_i64x4(0xF, mul1);
+        __m512i mul = _mm512_maskz_broadcast_i64x4(0x0F, mul1);
         mul = _mm512_mask_broadcast_i64x4(mul, 0xF0, mul2);
         debug("mul:\t"); debug_m512i(mul);
 
@@ -79,7 +81,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         out = _mm512_mask_xor_epi32(out, mask, out, _mm512_set1_epi32(-1));
         debug("neg:\t"); debug_m512i(out);
 
-        _mm512_storeu_epi32(ibuf+i, out);
+        _mm512_storeu_epi32(ibuf + i, out);
         debug("\n\n");
     }
 
@@ -108,7 +110,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("add\t"); debug_m512i(x);
 
         // permute to get the right order
-        x = _mm512_permutexvar_epi32(_mm512_set_epi32(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15), x);
+        x = _mm512_permutexvar_epi32(_mm512_set_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), x);
         debug("perm\t"); debug_m512i(x);
 
         // compress the array to one end
@@ -122,8 +124,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("write:\t"); debug_m128i(y);
         debug("mask2:\t %X\n", mask2);
 
-
-        _mm_storeu_epi8(outbuf+out_idx, y);
+        _mm_storeu_epi8(outbuf + out_idx, y);
         out_idx += __builtin_popcount(mask2);
 
         debug("rendered: %s\n", outbuf);

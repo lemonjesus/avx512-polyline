@@ -44,7 +44,7 @@ void basic_test() {
 
     encode_polyline(a, 17, out);
     if(strncmp(expected, out, strlen(expected)) != 0) {
-        printf("Basic Test Failed at point %d\n", 17);
+        printf("Basic Test Failed at point 17\n");
         printf("  Expected portion of %s\n", expected);
         printf("  Actually got        %s\n", out);
         exit(1);
