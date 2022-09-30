@@ -1,0 +1,4 @@
+*.o
+benchmark
+example
+test
