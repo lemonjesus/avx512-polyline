@@ -37,20 +37,25 @@ void print_m512i(__m512i v) {
 }
 
 void encode_polyline(double* a, int points, char* outbuf) {
-    double* buf = (double*)malloc(sizeof(double)*points*2);
     uint32_t* ibuf = (uint32_t*)malloc(sizeof(uint32_t)*ROUND_UP(points*2, 32));
     
-    // convert coordinates to deltas
-    buf[0] = a[0];
-    buf[1] = a[1];
-    
-    for (int i = 2; i < points * 2; i++) {
-        buf[i] = a[i] - a[i-2];
-    }
-
     for(int i = 0; i < points*2; i+=16) {
-        __m512d in1 = _mm512_loadu_pd(buf+i);
-        __m512d in2 = _mm512_loadu_pd(buf+i+8);
+        __mmask8 loadm1 = ((i+8-points*2) < 0) ? 0xFF : (0xFF >> (i+8-points*2))&0xFF;
+        __mmask8 loadm2 = ((i+16-points*2) < 0) ? 0xFF : (0xFF >> (i+16-points*2))&0xFF;
+        __m512d in1 = _mm512_maskz_loadu_pd(loadm1, a+i);
+        __m512d in2 = _mm512_maskz_loadu_pd(loadm2, a+i+8);
+
+        // calculate deltas
+        __m512d sub1 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in1);
+        __m512d sub2 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in2);
+        if(i != 0) sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
+        sub2 = _mm512_maskz_add_pd(loadm2, sub2, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i+7], a[i+6]));
+        debug("sub1:\t"); debug_m512(sub1);
+        debug("sub2:\t"); debug_m512(sub2);
+
+        in1 = _mm512_sub_pd(in1, sub1);
+        in2 = _mm512_sub_pd(in2, sub2);
+
         debug("in1:\t"); debug_m512(in1);
         debug("in2:\t"); debug_m512(in2);
 
@@ -75,6 +80,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("neg:\t"); debug_m512i(out);
 
         _mm512_storeu_epi32(ibuf+i, out);
+        debug("\n\n");
     }
 
     uint32_t out_idx = 0;
@@ -93,17 +99,13 @@ void encode_polyline(double* a, int points, char* outbuf) {
         mask1 = ((uint16_t)top << 8) | bottom;
         debug("mask1:\t %X\n", mask1);
 
-        // or with 0x20 according to mask2
+        // or with 0x20 according to mask1 shifted (all but last byte in sequence)
         x = _mm512_mask_or_epi32(x, mask1 << 1, x, _mm512_set1_epi32(0x20));
         debug("or\t"); debug_m512i(x);
 
-        // add 63 according to mask1 
-        x = _mm512_mask_add_epi32(x, mask1, x, _mm512_set1_epi32(63));
+        // add 63 according to all bytes (and zero out everything else)
+        x = _mm512_maskz_add_epi32(mask1, x, _mm512_set1_epi32(63));
         debug("add\t"); debug_m512i(x);
-        
-        // AND with zero according to mask3
-        x = _mm512_mask_and_epi32(x, ~mask1, x, _mm512_setzero_epi32());
-        debug("and\t"); debug_m512i(x);
 
         // permute to get the right order
         x = _mm512_permutexvar_epi32(_mm512_set_epi32(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15), x);
@@ -117,14 +119,16 @@ void encode_polyline(double* a, int points, char* outbuf) {
 
         // convert everything into 8-bit numbers
         __m128i y = _mm512_maskz_cvtepi32_epi8(0xFFFF, x);
-        debug_m128i(y);
+        debug("write:\t"); debug_m128i(y);
+        debug("mask2:\t %X\n", mask2);
 
-        _mm_mask_storeu_epi8(outbuf+out_idx, mask2, y);
+
+        _mm_storeu_epi8(outbuf+out_idx, y);
         out_idx += __builtin_popcount(mask2);
 
+        debug("rendered: %s\n", outbuf);
         debug("\n\n");
     }
 
-    free(buf);
     free(ibuf);
 }

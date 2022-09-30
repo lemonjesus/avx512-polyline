@@ -31,7 +31,8 @@ void basic_test() {
     // allocate an appropriate amount of space for the output. I think worst case is 6 characters per double, but I like my allocations on the safe side
     char* out = (char*)calloc(1, 0x100);
 
-    for(int i = 1; i < 17; i++) {
+    for(int i = 1; i <= 16; i++) {
+        memset(out, 0x100, 0);
         encode_polyline(a, i, out);
         if(strncmp(expected, out, strlen(out)) != 0) {
             printf("Basic Test Failed at point %d\n", i);
@@ -39,6 +40,14 @@ void basic_test() {
             printf("  Actually got        %s\n", out);
             exit(1);
         }
+    }
+
+    encode_polyline(a, 17, out);
+    if(strncmp(expected, out, strlen(expected)) != 0) {
+        printf("Basic Test Failed at point %d\n", 17);
+        printf("  Expected portion of %s\n", expected);
+        printf("  Actually got        %s\n", out);
+        exit(1);
     }
     free(out);
 }
