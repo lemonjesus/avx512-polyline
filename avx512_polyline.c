@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <immintrin.h>
+#include <pthread.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -39,7 +40,7 @@ void print_m512i(__m512i v) {
 
 void encode_polyline(double* a, int points, char* outbuf) {
     uint32_t *ibuf = (uint32_t*)malloc(sizeof(uint32_t)*ROUND_UP(points*2, 32));
-    
+
     for(int i = 0; i < points*2; i+=16) {
         __mmask8 loadm1 = ((i+8-points*2) < 0) ? 0xFF : (0xFF >> (i+8-points*2)) & 0xFF;
         __mmask8 loadm2 = ((i+16-points*2) < 0) ? 0xFF : (0xFF >> (i+16-points*2)) & 0xFF;
@@ -49,7 +50,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         // calculate deltas
         __m512d sub1 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in1);
         __m512d sub2 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in2);
-        if(i != 0) 
+        if(i != 0)
             sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
         sub2 = _mm512_maskz_add_pd(loadm2, sub2, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i+7], a[i+6]));
         debug("sub1:\t"); debug_m512(sub1);
@@ -132,4 +133,43 @@ void encode_polyline(double* a, int points, char* outbuf) {
     }
 
     free(ibuf);
+}
+
+struct polyline_encode_job {
+    double* a;
+    int points;
+    char* out;
+};
+
+void* encode_polyline_thread_execute(void* arg) {
+    struct polyline_encode_job* job = (struct polyline_encode_job*) arg;
+    encode_polyline(job->a, job->points, job->out);
+    return NULL;
+}
+
+void encode_polyline_threaded(double* a, int points, int threads, char* out) {
+    pthread_t* pthreads = (pthread_t*)malloc(sizeof(pthread_t) * threads);
+    char** outs = (char**)malloc(sizeof(char*)*threads);
+    struct polyline_encode_job* jobs = (struct polyline_encode_job*)malloc(sizeof(struct polyline_encode_job) * threads);
+
+    int ppt = points / threads;
+    for(int i = 0; i < threads; i++) {
+        outs[i] = (char*)calloc(1, sizeof(char) * ppt * 16);
+        jobs[i].a = a + (ppt*i);
+        jobs[i].points = (i == threads - 1) ? points - (ppt * (threads - 1)) : ppt;
+        jobs[i].out = outs[i];
+        pthread_create(&pthreads[i], NULL, encode_polyline_thread_execute, &jobs[i]);
+    }
+
+    int out_idx = 0;
+    for(int i = 0; i < threads; i++) {
+        pthread_join(pthreads[i], NULL);
+        int len = strlen(outs[i]);
+        memcpy(out + out_idx, outs[i], len);
+        out_idx += len;
+        free(outs[i]);
+    }
+    free(pthreads);
+    free(outs);
+    free(jobs);
 }
