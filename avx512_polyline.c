@@ -51,6 +51,9 @@ void encode_polyline(double* a, int points, char* outbuf) {
         __m512d sub2 = _mm512_maskz_permutexvar_pd(0xFC, _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), in2);
         if(i != 0) 
             sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
+        else
+            sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_setzero_pd());
+
         sub2 = _mm512_maskz_add_pd(loadm2, sub2, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i+7], a[i+6]));
         debug("sub1:\t"); debug_m512(sub1);
         debug("sub2:\t"); debug_m512(sub2);
@@ -65,8 +68,8 @@ void encode_polyline(double* a, int points, char* outbuf) {
         __m256i mul1 = _mm512_cvtpd_epi32(_mm512_mul_pd(in1, _mm512_set1_pd(1e5)));
         __m256i mul2 = _mm512_cvtpd_epi32(_mm512_mul_pd(in2, _mm512_set1_pd(1e5)));
 
-        __m512i mul = _mm512_maskz_broadcast_i64x4(0x0F, mul1);
-        mul = _mm512_mask_broadcast_i64x4(mul, 0xF0, mul2);
+        __m512i mul = _mm512_inserti32x8(_mm512_setzero_epi32(), mul1, 0);
+        mul = _mm512_inserti32x8(mul, mul2, 1);
         debug("mul:\t"); debug_m512i(mul);
 
         // shift left by 1 bit
