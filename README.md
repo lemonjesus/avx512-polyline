@@ -9,26 +9,18 @@ I've been looking for an excuse to experiment with SIMD instructions for a while
 **I haven't extensively tested this and it might fail on some edge cases I'm not aware of. It's fast, but it's not production ready!**
 
 ## Requirements
-Your processor needs to support the AVX512 instruction set and some of its extensions. My test platform was `skylake-avx512` - I believe this CPU platform is the minimum.
+Your processor needs to support the AVX512 instruction set and some of its extensions. My test platform was `icelake-server` - **on this particular branch** this CPU platform is the minimum.
 
 ## Encoding Performance
-Running my `benchmark` tool on a single core Skylake Server processor (`Intel(R) Xeon(R) CPU @ 2.00GHz`) running Ubuntu Server 22.04 I get the following results rather consistently (within a margin of error):
+Running my `benchmark` tool on a dual core Icelake Server processor (`Intel(R) Xeon(R) CPU @ 2.60GHz`) running Ubuntu Server 22.04 I get the following results rather consistently (within a margin of error):
 
 ```
-Encoded 4000000 random points 20 times in 1.406822 seconds
-Effective rate: 56865758.43 points per second
-```
-
-Using these test parameters, it's consistently able to get ~55 million point pairs processed per second (that's 110 million numbers per second!) On a 96 core Icelake Processor (2.60GHz), performance improves but not by much. This library is single threaded:
-
-```
-Encoded 4000000 random points 20 times in 1.029618 seconds
-Effective rate: 77698719.33 points per second
+Encoded 4000000 random points 20 times in 0.954889 seconds
+Effective rate: 83779371.21 points per second
 ```
 
 ## To Do
 * Write a decoder
-* Optimize for Icelake instead of Skylake so it's even _less_ portable. We can (theoretically) operate on 8 items at once instead of 2 using 8-bit numbers instead of 32-bit numbers in the second loop. The addition of `_mm512_maskz_compress_epi8` in `avx512_vbmi2` makes this easier. 8-bit variants of `or` and `and` don't exist, though. I haven't put much though into how to get around that.
 
 ## License
 MIT
