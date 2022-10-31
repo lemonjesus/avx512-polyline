@@ -28,7 +28,7 @@ Effective rate: 77698719.33 points per second
 
 ## To Do
 * Write a decoder
-* Optimize for Icelake instead of Skylake so it's even _less_ portable. We can (theoretically) operate on 8 items at once instead of 2 using 8-bit numbers instead of 32-bit numbers in the second loop. The addition of `_mm512_maskz_compress_epi8` in `avx512_vbmi2` makes this easier. 8-bit variants of `or` and `and` don't exist, though. I haven't put much though into how to get around that.
+* Optimize for Icelake instead of Skylake so it's even _less_ portable. This is sketched out on the `icelake` branch of this repo and, while it does go really fast, I still feel like there are improvmements that can be made with even newer more exclusive architectures that I don't have access to right now.
 
 ## License
 MIT
