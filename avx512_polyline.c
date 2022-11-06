@@ -159,7 +159,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("add\t"); debug_m512i8(x);
 
         // permute to get the right order
-        x = _mm512_permutexvar_epi8(_mm512_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63), x);
+        x = _mm512_permutexvar_epi8(_mm512_set_epi64(0x0001020304050607, 0x08090A0B0C0D0E0F, 0x1011121314151617, 0x18191A1B1C1D1E1F, 0x2021222324252627, 0x28292A2B2C2D2E2F, 0x3031323334353637, 0x38393A3B3C3D3E3F), x);
         debug("perm\t"); debug_m512i8(x);
 
         // compress the array to one end
