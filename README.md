@@ -16,7 +16,7 @@ Running my `benchmark` tool on a dual core Icelake Server processor (`Intel(R) X
 
 ```
 Encoded 4000000 random points 20 times in 0.954889 seconds
-Effective rate: 83779371.21 points per second
+Effective rate: 101459366.16 points per second
 ```
 
 ## To Do
