@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#define FIVE_BIT_CHUNKS(x) __builtin_ia32_bextr_u32(x, 0x500), __builtin_ia32_bextr_u32(x, 0x505), __builtin_ia32_bextr_u32(x, 0x50A), __builtin_ia32_bextr_u32(x, 0x50F), __builtin_ia32_bextr_u32(x, 0x514), __builtin_ia32_bextr_u32(x, 0x519)
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
 // #define POLYLINE_DEBUG
@@ -109,10 +108,10 @@ void encode_polyline(double* a, int points, char* outbuf) {
 
     for(int i = 0; i < points*2; i+=8) {
         // break the binary value out into 5-bit chunks
-        __m512i x = _mm512_set_epi8(FIVE_BIT_CHUNKS(ibuf[i+0]), 0, 0, FIVE_BIT_CHUNKS(ibuf[i+1]), 0, 0,
-                                    FIVE_BIT_CHUNKS(ibuf[i+2]), 0, 0, FIVE_BIT_CHUNKS(ibuf[i+3]), 0, 0,
-                                    FIVE_BIT_CHUNKS(ibuf[i+4]), 0, 0, FIVE_BIT_CHUNKS(ibuf[i+5]), 0, 0,
-                                    FIVE_BIT_CHUNKS(ibuf[i+6]), 0, 0, FIVE_BIT_CHUNKS(ibuf[i+7]), 0, 0);
+        __m512i x = _mm512_set_epi64(__builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+0], 0x1F1F1F1F1F1F)), __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+1], 0x1F1F1F1F1F1F)),
+                                     __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+2], 0x1F1F1F1F1F1F)), __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+3], 0x1F1F1F1F1F1F)),
+                                     __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+4], 0x1F1F1F1F1F1F)), __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+5], 0x1F1F1F1F1F1F)),
+                                     __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+6], 0x1F1F1F1F1F1F)), __builtin_bswap64(_pdep_u64((uint64_t)ibuf[i+7], 0x1F1F1F1F1F1F)));
         debug_m512i8(x);
 
         // make mask if greater than zero
