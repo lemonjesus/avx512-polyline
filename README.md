@@ -1,6 +1,6 @@
 # AVX512 Polyline
 
-An implementation of Google's Encoded Polyline algorithm in AVX512 because why not.
+An implementation of Google's Encoded Polyline algorithm in AVX512 because why not. This is the Skylake variant, which used to be the main version but I picked the Icelake version to be main because I wanted the fastest and least portable implementation possible for the memes.
 
 ## What? Why?
 
@@ -21,7 +21,6 @@ Effective rate: 79884806.11 points per second
 
 ## To Do
 * Write a decoder
-* Optimize for Icelake instead of Skylake so it's even _less_ portable. This is sketched out on the `icelake` branch of this repo and, while it does go really fast, I still feel like there are improvmements that can be made with even newer more exclusive architectures that I don't have access to right now.
 
 ## License
 MIT
