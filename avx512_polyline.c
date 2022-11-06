@@ -68,7 +68,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         if(i != 0) 
             sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i-1], a[i-2]));
         else
-            sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_set1_pd(0));
+            sub1 = _mm512_maskz_add_pd(loadm1, sub1, _mm512_setzero_pd());
 
         sub2 = _mm512_maskz_add_pd(loadm2, sub2, _mm512_set_pd(0, 0, 0, 0, 0, 0, a[i+7], a[i+6]));
         debug("sub1:\t"); debug_m512(sub1);
@@ -84,7 +84,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         __m256i mul1 = _mm512_cvtpd_epi32(_mm512_mul_pd(in1, _mm512_set1_pd(1e5)));
         __m256i mul2 = _mm512_cvtpd_epi32(_mm512_mul_pd(in2, _mm512_set1_pd(1e5)));
 
-        __m512i mul = _mm512_inserti32x8(_mm512_setzero_epi32(), mul1, 0);
+        __m512i mul = _mm512_inserti32x8(_mm512_setzero_si512(), mul1, 0);
         mul = _mm512_inserti32x8(mul, mul2, 1);
         debug("mul:\t"); debug_m512i(mul);
 
@@ -93,7 +93,7 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("slli:\t"); debug_m512i(out);
 
         // make a mask of what original values were negative
-        __mmask16 mask = _mm512_cmp_epi32_mask(mul, _mm512_setzero_epi32(), _MM_CMPINT_LT);
+        __mmask16 mask = _mm512_cmp_epi32_mask(mul, _mm512_setzero_si512(), _MM_CMPINT_LT);
         debug("mask:\t %X\n", mask);
 
         // use the mask to negate the values
@@ -115,19 +115,17 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug_m512i8(x);
 
         // make mask if greater than zero
-        __mmask64 mask1 = _mm512_cmpgt_epi8_mask(x, _mm512_setzero_epi32());
+        __mmask64 mask1 = _mm512_cmpgt_epi8_mask(x, _mm512_setzero_si512());
 
         // patch the holes in the mask to prevent deletion of valid zeros later
-        const __m128i lut_lo = _mm_set_epi8(0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 8);
-        const __m128i lut_hi = _mm_set_epi8(4, 5, 4, 6, 4, 5, 4, 7, 4, 5, 4, 6, 4, 5, 4, 8);
         const __m128i nibble_mask = _mm_set1_epi8(0x0F);
         __m128i v = _mm_set_epi64x(mask1, mask1);
         __m128i t;
 
         t = _mm_and_si128(nibble_mask, v);
         v = _mm_and_si128(_mm_srli_epi16(v, 4), nibble_mask);
-        t = _mm_shuffle_epi8(lut_lo, t);
-        v = _mm_shuffle_epi8(lut_hi, v);
+        t = _mm_shuffle_epi8(_mm_set_epi64((__m64)0x0001000200010003, (__m64)0x0001000200010008), t);
+        v = _mm_shuffle_epi8(_mm_set_epi64((__m64)0x0405040604050407, (__m64)0x0405040604050408), v);
         v = _mm_min_epu8(v, t);
         v = _mm_maskz_unpackhi_epi8(0x5555, v, v);
         
@@ -138,8 +136,8 @@ void encode_polyline(double* a, int points, char* outbuf) {
 
         mask = _mm_xor_epi32(mask, _mm_set1_epi32(-1));
         ormaskv = _mm_xor_epi32(ormaskv, _mm_set1_epi32(-1));
-        mask = _mm_packus_epi16(mask, _mm_set1_epi16(0));
-        ormaskv = _mm_packus_epi16(ormaskv, _mm_set1_epi16(0));
+        mask = _mm_packus_epi16(mask, _mm_setzero_si128());
+        ormaskv = _mm_packus_epi16(ormaskv, _mm_setzero_si128());
         mask = _mm_xor_epi32(mask, _mm_set1_epi32(-1));
         ormaskv = _mm_xor_epi32(ormaskv, _mm_set1_epi32(-1));
 
@@ -148,9 +146,9 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("mask1:\t %lld\n", mask1);
 
         // or with 0x20 and then reset the last byte in each sequence (due to a lack of _mm512_mask_or_epi8)
-        __m512i y = _mm512_or_epi32(x, _mm512_set1_epi8(0x20));
+        __m512i y = _mm512_or_epi64(x, _mm512_set1_epi8(0x20));
         debug("or\t"); debug_m512i8(y);
-        x = _mm512_mask_add_epi8(x, ormask, y, _mm512_set1_epi8(0));
+        x = _mm512_mask_add_epi8(x, ormask, y, _mm512_setzero_si512());
         debug("or\t"); debug_m512i8(x);
 
         // add 63 according to all bytes (and zero out everything else)
@@ -162,12 +160,12 @@ void encode_polyline(double* a, int points, char* outbuf) {
         debug("perm\t"); debug_m512i8(x);
 
         // compress the array to one end
-        __mmask64 mask2 = _mm512_cmpgt_epi8_mask(x, _mm512_setzero_epi32());
+        __mmask64 mask2 = _mm512_cmpgt_epi8_mask(x, _mm512_setzero_si512());
         x = _mm512_maskz_compress_epi8(mask2, x);
         debug("comp\t"); debug_m512i8(x);
         debug("to write: %d\n", _mm_popcnt_u64(mask2));
 
-        _mm512_storeu_epi8(outbuf + out_idx, x);
+        _mm512_storeu_epi64(outbuf + out_idx, x);
         out_idx += _mm_popcnt_u64(mask2);
 
         debug("rendered: %s\n", outbuf);
