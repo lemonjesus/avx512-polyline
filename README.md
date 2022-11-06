@@ -12,18 +12,11 @@ I've been looking for an excuse to experiment with SIMD instructions for a while
 Your processor needs to support the AVX512 instruction set and some of its extensions. My test platform was `skylake-avx512` - I believe this CPU platform is the minimum.
 
 ## Encoding Performance
-Running my `benchmark` tool on a single core Skylake Server processor (`Intel(R) Xeon(R) CPU @ 2.00GHz`) running Ubuntu Server 22.04 I get the following results rather consistently (within a margin of error):
+Running my `benchmark` tool on a dual core Icelake Server processor running Ubuntu Server 22.04 I get the following results rather consistently (within a margin of error):
 
 ```
 Encoded 4000000 random points 20 times in 1.406822 seconds
-Effective rate: 56865758.43 points per second
-```
-
-Using these test parameters, it's consistently able to get ~55 million point pairs processed per second (that's 110 million numbers per second!) On a 96 core Icelake Processor (2.60GHz), performance improves but not by much. This library is single threaded:
-
-```
-Encoded 4000000 random points 20 times in 1.029618 seconds
-Effective rate: 77698719.33 points per second
+Effective rate: 79884806.11 points per second
 ```
 
 ## To Do

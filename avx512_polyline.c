@@ -3,8 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define FIVE(x, i) (x >> (i*5)) & 0b00011111
-#define FIVE_BIT_CHUNKS(x) FIVE(x, 0), FIVE(x, 1), FIVE(x, 2), FIVE(x, 3), FIVE(x, 4), FIVE(x, 5)
+#define FIVE_BIT_CHUNKS(x) __builtin_ia32_bextr_u32(x, 0x500), __builtin_ia32_bextr_u32(x, 0x505), __builtin_ia32_bextr_u32(x, 0x50A), __builtin_ia32_bextr_u32(x, 0x50F), __builtin_ia32_bextr_u32(x, 0x514), __builtin_ia32_bextr_u32(x, 0x519)
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
 // #define POLYLINE_DEBUG
